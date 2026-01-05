@@ -44,7 +44,10 @@ def create_experiment(payload: schemas.ExperimentCreate, db: Session = Depends(g
     proj = crud.get_project(db, payload.project_id)
     if not proj:
         raise HTTPException(status_code=400, detail="Invalid project_id")
-    return crud.create_experiment(db, payload)
+    try:
+        return crud.create_experiment(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @router.get("/experiments/{experiment_id}", response_model=schemas.ExperimentOut)
 def get_experiment(experiment_id: int, db: Session = Depends(get_db)):
@@ -55,7 +58,10 @@ def get_experiment(experiment_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/experiments/{experiment_id}", response_model=schemas.ExperimentOut)
 def update_experiment(experiment_id: int, payload: schemas.ExperimentUpdate, db: Session = Depends(get_db)):
-    obj = crud.update_experiment(db, experiment_id, payload)
+    try:
+        obj = crud.update_experiment(db, experiment_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not obj:
         raise HTTPException(status_code=404, detail="Experiment not found")
     return obj
@@ -76,10 +82,14 @@ def create_result_schema(payload: schemas.ResultSchemaCreate, db: Session = Depe
     proj = crud.get_project(db, payload.project_id)
     if not proj:
         raise HTTPException(status_code=400, detail="Invalid project_id")
+    if payload.value_type == "categorical" and not payload.options:
+        raise HTTPException(status_code=422, detail="options is required for categorical fields")
     return crud.create_result_schema(db, payload)
 
 @router.patch("/result-schemas/{schema_id}", response_model=schemas.ResultSchemaOut)
 def update_result_schema(schema_id: int, payload: schemas.ResultSchemaUpdate, db: Session = Depends(get_db)):
+    if payload.value_type == "categorical" and not payload.options:
+        raise HTTPException(status_code=422, detail="options is required for categorical fields")
     obj = crud.update_result_schema(db, schema_id, payload)
     if not obj:
         raise HTTPException(status_code=404, detail="Result schema not found")
