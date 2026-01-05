@@ -66,6 +66,11 @@ export async function createResultSchema(payload: { project_id: number; key: str
   return r.data
 }
 
+export async function updateResultSchema(schemaId: number, payload: Partial<Omit<ResultSchema, 'id'|'project_id'|'created_at'|'key'>>) {
+  const r = await api.patch<ResultSchema>(`/api/result-schemas/${schemaId}`, payload)
+  return r.data
+}
+
 export async function deleteResultSchema(schemaId: number) {
   const r = await api.delete(`/api/result-schemas/${schemaId}`)
   return r.data
@@ -88,5 +93,10 @@ export async function listExperiments(projectId: number) {
 
 export async function createExperiment(payload: Omit<Experiment, 'id'|'created_at'>) {
   const r = await api.post<Experiment>('/api/experiments', payload)
+  return r.data
+}
+
+export async function updateExperiment(experimentId: number, payload: Partial<Omit<Experiment, 'id'|'project_id'|'created_at'>>) {
+  const r = await api.patch<Experiment>(`/api/experiments/${experimentId}`, payload)
   return r.data
 }
