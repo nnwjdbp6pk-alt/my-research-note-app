@@ -16,6 +16,7 @@ export default function NewExperimentPage() {
   const [materials, setMaterials] = useState<MaterialLine[]>([{ name: '', amount: 0, unit: 'g', ratio: 0 }])
   const [schemas, setSchemas] = useState<ResultSchema[]>([])
   const [results, setResults] = useState<Record<string, any>>({})
+  const [error, setError] = useState('')
 
   useEffect(() => {
     (async () => {
@@ -39,6 +40,15 @@ export default function NewExperimentPage() {
   }
 
   async function onSave() {
+    setError('')
+    if (!name.trim() || !author.trim() || !purpose.trim()) {
+      setError('Name, author, and purpose are required.')
+      return
+    }
+    if (materials.some(m => m.name && (m.ratio < 0 || m.ratio > 100))) {
+      setError('Material ratio must be between 0 and 100.')
+      return
+    }
     await createExperiment({
       project_id: projectId,
       name,
@@ -85,10 +95,15 @@ export default function NewExperimentPage() {
       <div className="small">Fields are defined in Project → Result schema.</div>
       <div style={{ marginTop: 10 }}>
         {schemas.map(s => (
-          <div key={s.id} className="row" style={{ marginBottom: 8 }}>
+          <div key={s.id} className="row" style={{ marginBottom: 8, alignItems: 'center' }}>
             <div style={{ minWidth: 220 }}><strong>{s.label}</strong> <span className="small">({s.key}, {s.value_type})</span></div>
             {s.value_type === 'quantitative' ? (
               <input className="input" type="number" value={results[s.key] ?? ''} onChange={e => updateResult(s.key, e.target.value === '' ? null : Number(e.target.value))} />
+            ) : s.value_type === 'categorical' ? (
+              <select className="input" value={results[s.key] ?? ''} onChange={e => updateResult(s.key, e.target.value)}>
+                <option value="">Select</option>
+                {(s.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
             ) : (
               <input className="input" value={results[s.key] ?? ''} onChange={e => updateResult(s.key, e.target.value)} />
             )}
@@ -99,6 +114,7 @@ export default function NewExperimentPage() {
       <div className="row" style={{ marginTop: 16 }}>
         <button className="btn" onClick={onSave}>Save</button>
         <div className="small">After saving, you will be redirected to Output.</div>
+        {error && <div style={{ color: 'red' }}>{error}</div>}
       </div>
     </div>
   )
