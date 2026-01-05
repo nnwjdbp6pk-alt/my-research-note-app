@@ -100,3 +100,13 @@ export async function updateExperiment(experimentId: number, payload: Partial<Om
   const r = await api.patch<Experiment>(`/api/experiments/${experimentId}`, payload)
   return r.data
 }
+export async function deleteProject(projectId: number) {
+  // 기존에 정의된 api(axios) 인스턴스를 사용하여 백엔드(api.py) 경로와 일치시킴
+  const r = await api.delete(`/api/projects/${projectId}`)
+  return r.data
+}
+
+export async function updateProject(id: number, payload: { status: 'ONGOING' | 'CLOSED' }) {
+  const r = await api.patch(`/api/projects/${id}`, payload)
+  return r.data
+}
