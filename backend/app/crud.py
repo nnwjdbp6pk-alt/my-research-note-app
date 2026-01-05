@@ -4,6 +4,32 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from . import models, schemas
 
+
+def _result_schema_map(db: Session, project_id: int) -> dict[str, models.ResultSchema]:
+    stmt = select(models.ResultSchema).where(models.ResultSchema.project_id == project_id)
+    return {s.key: s for s in db.scalars(stmt).all()}
+
+
+def validate_result_values(db: Session, project_id: int, values: dict[str, object]) -> None:
+    schema_map = _result_schema_map(db, project_id)
+    for key, val in values.items():
+        schema = schema_map.get(key)
+        if schema is None:
+            raise ValueError(f"Unknown result field: {key}")
+        if val is None:
+            continue
+        if schema.value_type == "quantitative":
+            if not isinstance(val, (int, float)):
+                raise ValueError(f"{key} must be numeric")
+        elif schema.value_type == "categorical":
+            if not isinstance(val, str):
+                raise ValueError(f"{key} must be text and match options")
+            if schema.options and val not in schema.options:
+                raise ValueError(f"{key} must be one of {schema.options}")
+        else:  # qualitative
+            if not isinstance(val, str):
+                raise ValueError(f"{key} must be text")
+
 def create_project(db: Session, data: schemas.ProjectCreate) -> models.Project:
     obj = models.Project(**data.model_dump())
     db.add(obj)
@@ -39,6 +65,7 @@ def delete_project(db: Session, project_id: int) -> bool:
 def create_experiment(db: Session, data: schemas.ExperimentCreate) -> models.Experiment:
     payload = data.model_dump()
     payload["materials"] = [m.model_dump() for m in data.materials]
+    validate_result_values(db, data.project_id, payload.get("result_values", {}))
     obj = models.Experiment(**payload)
     db.add(obj)
     db.commit()
@@ -59,6 +86,8 @@ def update_experiment(db: Session, experiment_id: int, data: schemas.ExperimentU
     patch = data.model_dump(exclude_unset=True)
     if "materials" in patch and patch["materials"] is not None:
         patch["materials"] = [m.model_dump() for m in patch["materials"]]
+    if "result_values" in patch and patch["result_values"] is not None:
+        validate_result_values(db, obj.project_id, patch["result_values"])
     for k, v in patch.items():
         setattr(obj, k, v)
     db.commit()
