@@ -42,10 +42,39 @@ class ProjectOut(BaseModel):
 
 class MaterialLine(BaseModel):
     """원료 배합 정보의 한 행(Row)을 정의하는 스키마"""
+
     name: str = Field(min_length=1, max_length=200, description="원료명")
-    amount: float = Field(gt=0, description="투입량 (0보다 커야 함)")
+    # 단일 값/배열 입력 모두 허용하되, 내부적으로는 배열(list[float])로 정규화한다.
+    amount: list[float] = Field(description="투입량 (0보다 큰 값의 배열)")
     unit: UnitType = Field(description="단위 (g/kg)")
     ratio: float = Field(ge=0, le=100, description="배합비 (0~100 사이)")
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def normalize_amount(cls, v: float | list[float]):
+        """숫자 또는 숫자 배열 입력을 모두 배열(list[float])로 정규화"""
+        if isinstance(v, (int, float)):
+            if v <= 0:
+                raise ValueError("투입량은 0보다 커야 합니다.")
+            return [float(v)]
+
+        if isinstance(v, list):
+            if len(v) == 0:
+                raise ValueError("투입량 목록이 비어 있습니다.")
+
+            amounts: list[float] = []
+            for item in v:
+                try:
+                    num = float(item)
+                except (TypeError, ValueError):
+                    raise ValueError("투입량은 숫자이거나 숫자 배열이어야 합니다.")
+                if num <= 0:
+                    raise ValueError("투입량은 0보다 커야 합니다.")
+                amounts.append(num)
+
+            return amounts
+
+        raise ValueError("투입량은 숫자 또는 숫자 배열이어야 합니다.")
 
 class ExperimentCreate(BaseModel):
     """실험 기록 생성 요청 스키마"""

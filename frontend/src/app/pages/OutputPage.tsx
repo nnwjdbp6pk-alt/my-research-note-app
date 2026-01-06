@@ -31,7 +31,7 @@ export type Experiment = {
   name: string
   author: string
   purpose: string
-  materials: { name: string; amount: number; unit: 'g'|'kg'; ratio: number }[]
+  materials: { name: string; amount: number[]; unit: 'g'|'kg'; ratio: number }[]
   result_values: Record<string, any>
   created_at: string
 }
@@ -138,11 +138,21 @@ export default function OutputPage() {
     [experiments, selectedExpIds]
   )
 
+  const toNumericSummary = (value: any) => {
+    if (Array.isArray(value)) {
+      const nums = value.map((v: any) => Number(v)).filter(v => !isNaN(v))
+      if (nums.length === 0) return NaN
+      const sum = nums.reduce((s, v) => s + v, 0)
+      return sum / nums.length
+    }
+    return Number(value ?? NaN)
+  }
+
   const getChartData = (key: string) => {
     if (!key) return []
     return visibleExperiments.map(ex => ({
       name: ex.name,
-      value: Number(ex.result_values?.[key] ?? NaN)
+      value: toNumericSummary(ex.result_values?.[key])
     })).filter(d => !isNaN(d.value)).reverse()
   }
 
@@ -150,49 +160,62 @@ export default function OutputPage() {
   const lineData = useMemo(() => getChartData(lineKey), [visibleExperiments, lineKey])
   
   // 실험별 Box Plot 데이터 생성 로직
+  const getBoxStats = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b)
+    const median = (arr: number[]) => {
+      const mid = Math.floor(arr.length / 2)
+      return arr.length % 2 === 0 ? (arr[mid - 1] + arr[mid]) / 2 : arr[mid]
+    }
+    const mid = Math.floor(sorted.length / 2)
+    const lower = sorted.slice(0, mid)
+    const upper = sorted.length % 2 === 0 ? sorted.slice(mid) : sorted.slice(mid + 1)
+
+    return {
+      min: sorted[0],
+      q1: lower.length ? median(lower) : sorted[0],
+      median: median(sorted),
+      q3: upper.length ? median(upper) : sorted[sorted.length - 1],
+      max: sorted[sorted.length - 1]
+    }
+  }
+
   const boxPlotSeries = useMemo(() => {
     if (!boxKey || visibleExperiments.length === 0) return []
-    
-    // Y축 스케일을 잡기 위한 전체 값 추출
-    const allValues = visibleExperiments
-      .map(ex => Number(ex.result_values?.[boxKey] ?? NaN))
-      .filter(v => !isNaN(v))
-    
-    if (allValues.length === 0) return []
-    
-    const globalMax = Math.max(...allValues)
-    const globalMin = Math.min(...allValues)
+
+    const extractValues = (val: any): number[] => {
+      if (Array.isArray(val)) return val.map((v: any) => Number(v)).filter(v => !isNaN(v))
+      const num = Number(val ?? NaN)
+      return isNaN(num) ? [] : [num]
+    }
+
+    const flattened = visibleExperiments.flatMap(ex => extractValues(ex.result_values?.[boxKey]))
+    if (flattened.length === 0) return []
+
+    const globalMax = Math.max(...flattened)
+    const globalMin = Math.min(...flattened)
     const range = (globalMax - globalMin) || 1
     const padding = range * 0.1
     const yMin = globalMin - padding
     const yMax = globalMax + padding
     const yRange = yMax - yMin
 
-    return visibleExperiments.map(ex => {
-      const val = Number(ex.result_values?.[boxKey] ?? NaN)
-      if (isNaN(val)) return null
-      
-      // 현재는 실험당 1개의 값이지만, 나중에 배열로 확장되어도 동작하도록 설계
-      const vals = [val].sort((a, b) => a - b)
-      
-      const getPos = (v: number) => 180 - ((v - yMin) / yRange * 160)
+    const getPos = (v: number) => 180 - ((v - yMin) / yRange * 160)
 
+    return visibleExperiments.map(ex => {
+      const vals = extractValues(ex.result_values?.[boxKey])
+      if (vals.length === 0) return null
+
+      const stats = getBoxStats(vals)
       return {
         name: ex.name,
-        raw: val,
-        stats: {
-          min: vals[0],
-          q1: vals[0],
-          median: vals[0],
-          q3: vals[0],
-          max: vals[0]
-        },
+        rawLabel: vals.length === 1 ? vals[0].toString() : `n=${vals.length}`,
+        stats,
         pos: {
-          min: getPos(vals[0]),
-          q1: getPos(vals[0]),
-          median: getPos(vals[0]),
-          q3: getPos(vals[0]),
-          max: getPos(vals[0])
+          min: getPos(stats.min),
+          q1: getPos(stats.q1),
+          median: getPos(stats.median),
+          q3: getPos(stats.q3),
+          max: getPos(stats.max)
         }
       }
     }).filter(d => d !== null)
@@ -202,8 +225,8 @@ export default function OutputPage() {
     if (!scatterXKey || !scatterYKey) return []
     return visibleExperiments.map(ex => ({
       name: ex.name,
-      x: Number(ex.result_values?.[scatterXKey] ?? NaN),
-      y: Number(ex.result_values?.[scatterYKey] ?? NaN),
+      x: toNumericSummary(ex.result_values?.[scatterXKey]),
+      y: toNumericSummary(ex.result_values?.[scatterYKey]),
     })).filter(d => !isNaN(d.x) && !isNaN(d.y))
   }, [visibleExperiments, scatterXKey, scatterYKey])
 
@@ -364,34 +387,34 @@ export default function OutputPage() {
                     <g key={idx}>
                       {/* 수직 Whisker 선 */}
                       <line x1={x} y1={item.pos.min} x2={x} y2={item.pos.max} stroke="#ccc" strokeWidth="2" strokeDasharray="3" />
-                      
+
                       {/* 수염 끝부분 (Min/Max) */}
                       <line x1={x - 15} y1={item.pos.min} x2={x + 15} y2={item.pos.min} stroke="#666" strokeWidth="1.5" />
                       <line x1={x - 15} y1={item.pos.max} x2={x + 15} y2={item.pos.max} stroke="#666" strokeWidth="1.5" />
 
-                      {/* Box (Q1 ~ Q3) - 현재 단일값이라 높이가 0이므로 강조 원형으로 대체 혹은 아주 얇은 박스 */}
-                      <rect 
-                        x={x - 20} 
-                        y={item.pos.q1 - 2} 
-                        width="40" 
-                        height="4" 
-                        fill="var(--primary-color)" 
-                        fillOpacity="0.4" 
-                        stroke="var(--primary-color)" 
-                        strokeWidth="1" 
+                      {/* Box (Q1 ~ Q3) */}
+                      <rect
+                        x={x - 20}
+                        y={item.pos.q3}
+                        width="40"
+                        height={Math.max(2, item.pos.q1 - item.pos.q3)}
+                        fill="var(--primary-color)"
+                        fillOpacity="0.2"
+                        stroke="var(--primary-color)"
+                        strokeWidth="1"
                       />
 
-                      {/* 중앙값 (Median) - 강조 표시 */}
+                      {/* 중앙값 (Median) */}
                       <line x1={x - 25} y1={item.pos.median} x2={x + 25} y2={item.pos.median} stroke="var(--primary-color)" strokeWidth="3" />
-                      
-                      {/* 실험명 라벨 (세로 혹은 생략) */}
+
+                      {/* 실험명 라벨 */}
                       <text x={x} y="210" fontSize="10" fill="#666" textAnchor="middle" fontWeight="bold">
                         {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
                       </text>
-                      
-                      {/* 수치 라벨 */}
+
+                      {/* 데이터 라벨: 단일값은 값, 배열은 개수 표시 */}
                       <text x={x} y={item.pos.median - 10} fontSize="10" fill="var(--primary-color)" textAnchor="middle" fontWeight="bold">
-                        {item.raw}
+                        {item.rawLabel}
                       </text>
                     </g>
                   );

@@ -16,7 +16,7 @@ def test_health():
 
 def test_project_crud_roundtrip():
     r = client.post("/api/projects", json={"name": "T_Project_1", "project_type": "VOC", "status": "ONGOING"})
-    assert r.status_code == 200
+    assert r.status_code == 201
     pid = r.json()["id"]
 
     r = client.get("/api/projects")
@@ -58,8 +58,8 @@ def test_experiment_result_value_validation():
     }
     r = client.post("/api/experiments", json=payload)
     assert r.status_code == 400
-    assert "numeric" in r.json()["detail"]
+    assert "숫자" in r.json()["detail"]
 
     payload["result_values"] = {"temperature": 23.5}
     r = client.post("/api/experiments", json=payload)
-    assert r.status_code == 200
+    assert r.status_code == 201

@@ -40,11 +40,11 @@ export type Experiment = {
   name: string
   author: string
   purpose: string
-  materials: { 
-    name: string; 
-    amount: number; 
-    unit: 'g'|'kg'; 
-    ratio: number 
+  materials: {
+    name: string;
+    amount: number[];
+    unit: 'g'|'kg';
+    ratio: number
   }[]
   result_values: Record<string, any>
   created_at: string

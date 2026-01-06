@@ -29,11 +29,21 @@ def validate_result_values(db: Session, project_id: int, values: dict[str, objec
             continue
             
         if schema.value_type == "quantitative":
-            # 숫자형 변환 시도 및 검증
+            # 단일 숫자 또는 숫자 배열 입력을 모두 허용
+            if isinstance(val, list):
+                cleaned: list[float] = []
+                for item in val:
+                    try:
+                        cleaned.append(float(item))
+                    except (ValueError, TypeError):
+                        raise ValueError(f"'{schema.label}' 항목은 숫자 또는 숫자 배열이어야 합니다. (입력값: {val})")
+                values[key] = cleaned
+                continue
+
             try:
                 values[key] = float(val)
             except (ValueError, TypeError):
-                raise ValueError(f"'{schema.label}' 항목은 숫자여야 합니다. (입력값: {val})")
+                raise ValueError(f"'{schema.label}' 항목은 숫자 또는 숫자 배열이어야 합니다. (입력값: {val})")
         
         elif schema.value_type == "categorical":
             if not isinstance(val, str):
