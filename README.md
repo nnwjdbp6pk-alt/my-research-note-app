@@ -56,28 +56,34 @@ POST /api/experiments
 - **시드 데이터**: `python -m app.seed`로 프로젝트/결과항목/샘플 실험 생성
 
 ## F) 로컬 실행 방법
-### Backend (Windows PowerShell)
-```powershell
+### 사전 요구 사항
+- Python 3.11+ (권장)
+- Node.js 18+ (Vite 6 대응)
+- SQLite (기본값: `backend/app.db`, 별도 설정 없으면 자동 생성)
+
+### Backend (터미널/PowerShell 공통)
+```bash
 cd backend
 python -m venv .venv
-\.\.venv\Scripts\Activate.ps1
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-alembic upgrade head   # 최초 1회 마이그레이션
-python -m app.seed     # 샘플 데이터
+alembic upgrade head   # 최초 1회 마이그레이션 및 테이블 생성
+python -m app.seed     # 샘플 프로젝트/결과 항목/실험 데이터 생성
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 API 문서: http://127.0.0.1:8000/docs
 
-### Frontend
-```powershell
+### Frontend (터미널/PowerShell 공통)
+```bash
 cd frontend
 npm install
-npm run dev
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
-앱: http://localhost:5173 (백엔드 CORS 허용: http://localhost:5173)
+앱: http://127.0.0.1:5173 (백엔드 CORS 기본 허용 오리진)
 
 ### 테스트 (백엔드)
-```powershell
+```bash
 cd backend
 pytest -q
 ```
