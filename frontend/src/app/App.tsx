@@ -18,6 +18,7 @@ export default function App() {
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           <Route path="/projects/:projectId/output" element={<OutputPage />} />
           <Route path="/projects/:projectId/experiments/new" element={<NewExperimentPage />} />
+		  <Route path="/projects/:projectId/experiments/:experimentId/edit" element={<NewExperimentPage />} />
         </Routes>
       </div>
     </div>
