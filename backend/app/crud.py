@@ -23,17 +23,27 @@ def validate_result_values(db: Session, project_id: int, values: dict[str, objec
     for key, val in values.items():
         schema = schema_map.get(key)
         if schema is None:
-            raise ValueError(f"정의되지 않은 필드입니다: {key}")
+            # 정의되지 않은 필드는 무시하거나 에러 처리 (정책에 따라)
+            continue 
         
         if val is None or val == "":
             continue
             
         if schema.value_type == "quantitative":
-            # 숫자형 변환 시도 및 검증
-            try:
-                values[key] = float(val)
-            except (ValueError, TypeError):
-                raise ValueError(f"'{schema.label}' 항목은 숫자여야 합니다. (입력값: {val})")
+            # [수정] 리스트(배열)인 경우와 단일 값인 경우 모두 처리
+            if isinstance(val, list):
+                # 배열 내부의 모든 요소가 숫자인지 확인
+                try:
+                    # 모든 요소를 float로 변환 가능한지 체크 (실제 변환은 하지 않음, 저장 시 처리)
+                    for v in val:
+                        float(v)
+                except (ValueError, TypeError):
+                    raise ValueError(f"'{schema.label}' 항목의 배열 값 중 숫자가 아닌 것이 포함되어 있습니다.")
+            else:
+                try:
+                    values[key] = float(val)
+                except (ValueError, TypeError):
+                    raise ValueError(f"'{schema.label}' 항목은 숫자여야 합니다. (입력값: {val})")
         
         elif schema.value_type == "categorical":
             if not isinstance(val, str):
