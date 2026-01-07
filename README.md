@@ -64,7 +64,7 @@ python -m venv .venv
 pip install -r requirements.txt
 alembic upgrade head   # 최초 1회 마이그레이션
 python -m app.seed     # 샘플 데이터
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 API 문서: http://127.0.0.1:8000/docs
 
@@ -72,7 +72,7 @@ API 문서: http://127.0.0.1:8000/docs
 ```powershell
 cd frontend
 npm install
-npm run dev
+npm run dev -- --host
 ```
 앱: http://localhost:5173 (백엔드 CORS 허용: http://localhost:5173)
 
