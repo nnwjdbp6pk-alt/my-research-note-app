@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-export const api = axios.create({ baseURL: 'http://127.0.0.1:8000' })
+const SERVER_IP = '192.168.1.198';
+export const api = axios.create({ baseURL: `http://${SERVER_IP}:8000` })
 
 // --- 프로젝트 타입 정의 ---
 export type Project = {

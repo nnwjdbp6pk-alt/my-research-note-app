@@ -46,6 +46,42 @@ const listResultSchemas = async (projectId: number) => (await api.get<ResultSche
 const listExperiments = async (projectId: number) => (await api.get<Experiment[]>(`/api/projects/${projectId}/experiments`)).data
 const getOutputConfig = async (projectId: number) => (await api.get<OutputConfig | null>(`/api/projects/${projectId}/output-config`)).data
 const deleteExperiment = async (id: number) => (await api.delete(`/api/experiments/${id}`)).data
+const calcStats = (values: number[]) => {
+  if (!values || values.length === 0) return null;
+  
+  // 정렬
+  const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  
+  // 평균(Mean)
+  const sum = sorted.reduce((a, b) => a + b, 0);
+  const mean = sum / sorted.length;
+
+  // 중앙값(Median) 및 사분위수(Q1, Q3)
+  const getQuantile = (arr: number[], q: number) => {
+    const pos = (arr.length - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    if (arr[base + 1] !== undefined) {
+      return arr[base] + rest * (arr[base + 1] - arr[base]);
+    } else {
+      return arr[base];
+    }
+  };
+  const q1 = getQuantile(sorted, 0.25);
+  const median = getQuantile(sorted, 0.5);
+  const q3 = getQuantile(sorted, 0.75);
+
+  return { min, q1, median, q3, max, mean, raw: values };
+};
+
+const normalizeValue = (val: any): number[] => {
+    if (Array.isArray(val)) return val.map(v => Number(v));
+    if (typeof val === 'number') return [val];
+    if (typeof val === 'string' && !isNaN(Number(val))) return [Number(val)];
+    return [];
+}
 
 /**
  * OutputPage: 실험 필터링 및 실험별 비교 Box Plot이 포함된 분석 페이지
@@ -106,6 +142,11 @@ export default function OutputPage() {
     }
   }
 
+
+  useEffect(() => { 
+  refresh(); 
+  }, [projectId]);
+
   useEffect(() => {
   // 현재 선택된 barKey가 유효한 정량적 스키마 목록에 없으면, 목록의 첫 번째로 재설정
   if (quantitativeSchemas.length > 0) {
@@ -138,13 +179,48 @@ export default function OutputPage() {
     [experiments, selectedExpIds]
   )
 
-  const getChartData = (key: string) => {
-    if (!key) return []
-    return visibleExperiments.map(ex => ({
+ // 1. getChartData 함수 정의 (여기서 끝냅니다)
+const getChartData = (key: string) => {
+  if (!key) return []
+  return visibleExperiments.map(ex => {
+    const rawVal = ex.result_values?.[key];
+    const nums = normalizeValue(rawVal);
+    
+    if (nums.length === 0) return null;
+
+    const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+    
+    return {
       name: ex.name,
-      value: Number(ex.result_values?.[key] ?? NaN)
-    })).filter(d => !isNaN(d.value)).reverse()
-  }
+      value: Number(mean.toFixed(2))
+    };
+  }).filter(d => d !== null).reverse()
+}; // <--- [중요] getChartData는 여기서 닫아주세요!
+
+
+// 2. 원료명 추출 (컴포넌트 레벨에서 선언)
+const allMaterialNames = useMemo(() => {
+  const names = new Set<string>();
+  visibleExperiments.forEach(ex => {
+    ex.materials.forEach(m => names.add(m.name));
+  });
+  return Array.from(names).sort();
+}, [visibleExperiments]);
+
+
+// 3. 배합비 데이터 변환 (컴포넌트 레벨에서 선언)
+const materialData = useMemo(() => {
+  return visibleExperiments.map(ex => {
+    const row: any = { name: ex.name };
+    
+    ex.materials.forEach(m => {
+      row[m.name] = m.ratio;
+      row[`${m.name}_amount`] = m.amount;
+      row[`${m.name}_unit`] = m.unit;
+    });
+    return row;
+  }).reverse();
+}, [visibleExperiments]);
 
   const barData = useMemo(() => getChartData(barKey), [visibleExperiments, barKey])
   const lineData = useMemo(() => getChartData(lineKey), [visibleExperiments, lineKey])
@@ -153,46 +229,45 @@ export default function OutputPage() {
   const boxPlotSeries = useMemo(() => {
     if (!boxKey || visibleExperiments.length === 0) return []
     
-    // Y축 스케일을 잡기 위한 전체 값 추출
-    const allValues = visibleExperiments
-      .map(ex => Number(ex.result_values?.[boxKey] ?? NaN))
-      .filter(v => !isNaN(v))
+    // 1. 전체 Y축 스케일을 잡기 위해 모든 데이터 수집
+    let allNumbers: number[] = [];
+    visibleExperiments.forEach(ex => {
+        const nums = normalizeValue(ex.result_values?.[boxKey]);
+        allNumbers = allNumbers.concat(nums);
+    });
     
-    if (allValues.length === 0) return []
+    if (allNumbers.length === 0) return []
     
-    const globalMax = Math.max(...allValues)
-    const globalMin = Math.min(...allValues)
+    const globalMax = Math.max(...allNumbers);
+    const globalMin = Math.min(...allNumbers);
+    
+    // 그래프 여백 설정
     const range = (globalMax - globalMin) || 1
-    const padding = range * 0.1
+    const padding = range * 0.2
     const yMin = globalMin - padding
     const yMax = globalMax + padding
     const yRange = yMax - yMin
 
+    // 2. 실험별 통계 산출
     return visibleExperiments.map(ex => {
-      const val = Number(ex.result_values?.[boxKey] ?? NaN)
-      if (isNaN(val)) return null
+      const nums = normalizeValue(ex.result_values?.[boxKey]);
+      if (nums.length === 0) return null;
       
-      // 현재는 실험당 1개의 값이지만, 나중에 배열로 확장되어도 동작하도록 설계
-      const vals = [val].sort((a, b) => a - b)
-      
+      const stats = calcStats(nums); // 위에서 만든 함수 사용
+      if (!stats) return null;
+
+      // 좌표 변환 함수 (SVG 좌표계)
       const getPos = (v: number) => 180 - ((v - yMin) / yRange * 160)
 
       return {
         name: ex.name,
-        raw: val,
-        stats: {
-          min: vals[0],
-          q1: vals[0],
-          median: vals[0],
-          q3: vals[0],
-          max: vals[0]
-        },
+        stats: stats, // min, q1, median, q3, max 포함
         pos: {
-          min: getPos(vals[0]),
-          q1: getPos(vals[0]),
-          median: getPos(vals[0]),
-          q3: getPos(vals[0]),
-          max: getPos(vals[0])
+          min: getPos(stats.min),
+          q1: getPos(stats.q1),
+          median: getPos(stats.median),
+          q3: getPos(stats.q3),
+          max: getPos(stats.max)
         }
       }
     }).filter(d => d !== null)
@@ -362,38 +437,41 @@ export default function OutputPage() {
                   const x = 60 + idx * 80;
                   return (
                     <g key={idx}>
-                      {/* 수직 Whisker 선 */}
-                      <line x1={x} y1={item.pos.min} x2={x} y2={item.pos.max} stroke="#ccc" strokeWidth="2" strokeDasharray="3" />
-                      
-                      {/* 수염 끝부분 (Min/Max) */}
-                      <line x1={x - 15} y1={item.pos.min} x2={x + 15} y2={item.pos.min} stroke="#666" strokeWidth="1.5" />
-                      <line x1={x - 15} y1={item.pos.max} x2={x + 15} y2={item.pos.max} stroke="#666" strokeWidth="1.5" />
+					{/* 1. Whisker (수염): Max ~ Min 전체 연결선 */}
+					<line x1={x} y1={item.pos.min} x2={x} y2={item.pos.max} stroke="#ccc" strokeWidth="1" strokeDasharray="3" />
+      
+					{/* 2. Caps (최대/최소 가로선) */}
+					<line x1={x - 10} y1={item.pos.min} x2={x + 10} y2={item.pos.min} stroke="#666" strokeWidth="2" />
+					<line x1={x - 10} y1={item.pos.max} x2={x + 10} y2={item.pos.max} stroke="#666" strokeWidth="2" />
 
-                      {/* Box (Q1 ~ Q3) - 현재 단일값이라 높이가 0이므로 강조 원형으로 대체 혹은 아주 얇은 박스 */}
-                      <rect 
-                        x={x - 20} 
-                        y={item.pos.q1 - 2} 
-                        width="40" 
-                        height="4" 
-                        fill="var(--primary-color)" 
-                        fillOpacity="0.4" 
-                        stroke="var(--primary-color)" 
-                        strokeWidth="1" 
-                      />
+					{/* 3. Box (Q1 ~ Q3) : 진짜 박스 그리기 */}
+					<rect 
+						x={x - 20} 
+						y={item.pos.q3} // SVG에서는 y좌표가 작을수록 위쪽이므로, q3(큰값)가 y좌표는 더 작아야 함(하지만 위 getPos식에서 이미 뒤집음. getPos(HighValue) -> Low Y)
+						// 주의: getPos 로직상 값이 클수록 y좌표는 작아집니다 (0이 최상단). 
+						// 따라서 y는 item.pos.q3 (화면상 위쪽), height는 (q1 - q3) 
+						// (값: Q3 > Q1, 좌표: pos.Q3 < pos.Q1)
+						width="40" 
+						height={Math.abs(item.pos.q1 - item.pos.q3)} 
+						fill="var(--primary-color)" 
+						fillOpacity="0.3" 
+						stroke="var(--primary-color)" 
+						strokeWidth="2" 
+					/>
 
-                      {/* 중앙값 (Median) - 강조 표시 */}
-                      <line x1={x - 25} y1={item.pos.median} x2={x + 25} y2={item.pos.median} stroke="var(--primary-color)" strokeWidth="3" />
-                      
-                      {/* 실험명 라벨 (세로 혹은 생략) */}
-                      <text x={x} y="210" fontSize="10" fill="#666" textAnchor="middle" fontWeight="bold">
-                        {item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
-                      </text>
-                      
-                      {/* 수치 라벨 */}
-                      <text x={x} y={item.pos.median - 10} fontSize="10" fill="var(--primary-color)" textAnchor="middle" fontWeight="bold">
-                        {item.raw}
-                      </text>
-                    </g>
+					{/* 4. Median (중앙값) 가로선 */}
+					<line x1={x - 20} y1={item.pos.median} x2={x + 20} y2={item.pos.median} stroke="#d946ef" strokeWidth="3" />
+      
+					{/* 5. 라벨 */}
+					<text x={x} y="210" fontSize="10" fill="#666" textAnchor="middle" fontWeight="bold">
+						{item.name.length > 8 ? item.name.substring(0, 8) + '..' : item.name}
+					</text>
+      
+					{/* 평균값 텍스트 (박스 위에 표시) */}
+					<text x={x} y={item.pos.max - 5} fontSize="10" fill="#666" textAnchor="middle">
+						{item.stats.mean.toFixed(1)}
+					</text>
+					</g>
                   );
                 })}
                 {/* Y축 가이드선 (임시) */}
@@ -405,7 +483,46 @@ export default function OutputPage() {
           </div>
         </div>
       </div>
-
+	  
+	  <div className="card" style={{ marginBottom: '30px' }}>
+        <h3 style={{ marginTop: 0, marginBottom: '15px' }}>🧪 원료 배합 비교 (Recipe Comparison)</h3>       
+        {/* 1. 배합 상세 비교 테이블 */}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="table">
+            <thead>
+              <tr style={{ backgroundColor: '#f0fdf4' }}> {/* 헤더 색상을 다르게 하여 결과표와 구분 */}
+                <th style={{ minWidth: '150px' }}>실험명</th>
+                {allMaterialNames.map(name => (
+                  <th key={name} style={{ textAlign: 'center' , fontSize: '12px'}}>{name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleExperiments.map(ex => (
+                <tr key={ex.id}>
+                  <td><strong>{ex.name}</strong></td>
+                  {allMaterialNames.map(name => {
+                    // 해당 실험에 이 원료가 있는지 찾기
+                    const mat = ex.materials.find(m => m.name === name);
+                    return (
+                      <td key={name} style={{ textAlign: 'center' }}>
+                        {mat ? (
+                          <div>
+                            <span style={{ fontWeight: 'bold', color: '#2563eb', fontSize: '14px' }}>{mat.ratio.toFixed(1)}%</span>
+                            <div style={{ fontSize: '0.8em', color: '#666' }}>({mat.amount}{mat.unit})</div>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#ccc' }}>-</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>	  
       <div className="card">
         <h3 style={{ marginTop: 0, marginBottom: '15px' }}>실험 상세 기록</h3>
         <div style={{ overflowX: 'auto' }}>
@@ -429,7 +546,40 @@ export default function OutputPage() {
                        <strong>{ex.name}</strong>
                     </div>
                   </td>
-                  {includedSchemas.map(s => <td key={s.key}>{ex.result_values[s.key] ?? '-'}</td>)}
+					{includedSchemas.map(s => {
+					const rawVal = ex.result_values[s.key];
+					// 1. 배열 형태든 단일 값이든 배열로 통일 (이전에 만든 헬퍼 함수 사용)
+					const nums = normalizeValue(rawVal);
+        
+					let displayVal = '-';
+					let tooltip = '';
+
+					if (nums.length > 0) {
+						// 2. 평균(Mean) 계산
+						const mean = nums.reduce((sum, n) => sum + n, 0) / nums.length;
+           
+						// 3. 소수점 처리: 정수면 그대로, 실수면 소수점 3자리까지
+						displayVal = Number.isInteger(mean) ? mean.toString() : mean.toFixed(2);
+           
+						// 4. 값이 여러 개라면 툴팁용 원본 문자열 생성
+						if (nums.length > 1) {
+							tooltip = `원본 데이터: [${nums.join(', ')}]`;
+						}
+					}
+
+					return (
+						<td 
+							key={s.key} 
+							title={tooltip} // 마우스 오버 시 원본 값 표시
+							style={{ cursor: tooltip ? 'help' : 'default' }} // 툴팁이 있으면 커서 변경
+						>
+							{displayVal}
+            
+							{/* [선택 사항] 값이 여러 개(배열)인 경우 개수를 작게 표시해 주면 좋습니다 */}
+							{tooltip && <span style={{ fontSize: '0.75em', color: '#999', marginLeft: '4px' }}>(n={nums.length})</span>}
+						</td>
+					)
+					})}
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
                       <button className="btn-small" onClick={() => navigate(`/projects/${projectId}/experiments/${ex.id}/edit`)}>수정</button>
@@ -442,6 +592,7 @@ export default function OutputPage() {
           </table>
         </div>
       </div>
+	  
     </div>
   )
 }

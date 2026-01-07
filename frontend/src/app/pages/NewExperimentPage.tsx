@@ -36,6 +36,8 @@ const listResultSchemas = async (projectId: number) => {
   const r = await api.get<ResultSchema[]>(`/api/projects/${projectId}/result-schemas`)
   return r.data.sort((a, b) => a.order - b.order)
 }
+const listExperiments = async (projectId: number) => (await api.get<Experiment[]>(`/api/projects/${projectId}/experiments`)).data
+
 
 type MaterialLine = { name: string; amount: number; unit: 'g'|'kg'; ratio: number }
 
@@ -52,12 +54,15 @@ export default function NewExperimentPage() {
   const [schemas, setSchemas] = useState<ResultSchema[]>([])
   const [results, setResults] = useState<Record<string, any>>({})
   const [error, setError] = useState('')
-
+  const [experimentList, setExperimentList] = useState<Experiment[]>([]);
+  
   useEffect(() => {
     (async () => {
       try {
         const s = await listResultSchemas(projectId)
         setSchemas(s)
+		const exps = await listExperiments(projectId);
+		setExperimentList(exps);
 
         if (experimentId) {
           const ex = await getExperiment(experimentId)
@@ -103,6 +108,28 @@ export default function NewExperimentPage() {
     })
   }
 
+  function loadRecipeFromExperiment(targetIdStr: string) {
+	  if (!targetIdStr) return;
+	  // 실수 방지: 작성 중인 내용이 덮어씌워짐을 경고
+      if (!window.confirm("현재 입력된 원료 목록이 사라지고 선택한 실험의 배합으로 대체됩니다. 진행하시겠습니까?")) {
+      return;
+    }
+	
+	const targetId = Number(targetIdStr);
+	const targetExp = experimentList.find(e => e.id === targetId);
+	
+	if (targetExp && targetExp.materials) {
+		const newMaterials: MaterialLine[] = targetExp.materials.map(m => ({
+			name: m.name,
+			amount: Number(m.amount), // 혹시 모를 문자열 변환 방지
+			unit: m.unit,
+			ratio: Number(m.ratio)
+		}));
+		
+		setMaterials(newMaterials);
+	}
+  }
+
   async function onSave() {
     setError('')
     if (!name.trim() || !author.trim() || !purpose.trim()) {
@@ -129,14 +156,33 @@ export default function NewExperimentPage() {
     });
 	
 	schemas.forEach(schema => {
-        const val = results[schema.key];
-        
-        // 값이 없으면 건너뜀
+       const val = results[schema.key];
         if (val === null || val === undefined || val === '') return;
         
         if (schema.value_type === 'quantitative') {
-            // [핵심] 여기서 최종적으로 숫자로 변환하여 전송
-            cleanedResults[schema.key] = Number(val);
+            // [수정] 쉼표로 구분된 문자열을 처리
+            if (typeof val === 'string' && val.includes(',')) {
+                // 1. 쉼표로 분리
+                // 2. 공백 제거
+                // 3. 빈 문자열 제외
+                // 4. 숫자로 변환
+                const numArr = val.split(',')
+                    .map(v => v.trim())
+                    .filter(v => v !== '')
+                    .map(v => Number(v))
+                    .filter(v => !isNaN(v)); // 유효한 숫자만 남김
+                
+                // 유효한 숫자가 하나라도 있으면 배열로 저장
+                if (numArr.length > 0) {
+                    cleanedResults[schema.key] = numArr;
+                }
+            } else {
+                // 기존 로직: 단일 값 처리
+                const numVal = Number(val);
+                if (!isNaN(numVal)) {
+                    cleanedResults[schema.key] = numVal; 
+                }
+            }
         } else {
             cleanedResults[schema.key] = val;
         }
@@ -189,9 +235,32 @@ export default function NewExperimentPage() {
         <label className="small" style={{ fontWeight: 'bold', marginBottom: '6px' }}>실험 목적 및 조건</label>
         <textarea className="input" style={{ width: '100%', minHeight: 100, boxSizing: 'border-box' }} placeholder="실험 조건을 상세히 기록하세요" value={purpose} onChange={e => setPurpose(e.target.value)} />
       </div>
-      
       <div style={{ marginBottom: '30px' }}>
-        <h3 style={{ borderBottom: '2px solid #eee', paddingBottom: '10px' }}>원료 배합</h3>
+		<div style={{ marginBottom: '30px' }}>
+			{/* [수정 5] 제목 영역을 flex로 변경하여 우측에 불러오기 버튼 배치 */}
+			<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '10px', marginBottom: '15px' }}>
+				<h3 style={{ margin: 0, border: 'none', padding: 0 }}>원료 배합</h3>
+				
+				{/* 배합 불러오기 드롭다운 */}
+				<select
+					className="input" 
+					style={{ width: 'auto', minWidth: '250px', fontSize: '0.9em' }}
+					onChange={(e) => {
+						loadRecipeFromExperiment(e.target.value)
+						e.target.value = ""; // 선택 후 다시 초기화 (같은 실험을 다시 선택할 수도 있으므로)
+					}}
+				>
+					<option value="">📂 기존 실험에서 배합 가져오기...</option>
+					{experimentList
+						.filter(ex => ex.id !== experimentId) // 자기 자신은 제외 (수정 모드일 때)
+						.map(ex => (
+						<option key={ex.id} value={ex.id}>
+							[{ex.created_at.substring(0, 10)}] {ex.name}
+						</option>
+					))}
+				</select>
+		</div>
+		</div>
         <table className="table" style={{ width: '100%' }}>
           <thead>
             <tr>
@@ -243,11 +312,12 @@ export default function NewExperimentPage() {
                 {s.value_type === 'quantitative' ? (
                   <input 
 				  className="input" 
-				  type="number" // 브라우저 레벨에서 숫자 키패드 제공
+				  type="text"  // [변경] number -> text (쉼표 입력을 위해)
+				  placeholder="예: 10, 10.5, 11" // [추가] 예시 제공
 				  step="any"    // 소수점 입력 허용
 				  style={{ width: '100%' }} 
-				  // [중요] null이면 빈 문자열로, 아니면 문자열 그대로 표시
-				  value={results[s.key] ?? ''} 
+				  // 배열이면 쉼표로 합쳐서 보여주고, 아니면 그대로 보여줌
+				  value={Array.isArray(results[s.key]) ? results[s.key].join(', ') : (results[s.key] ?? '')}  
 				  onChange={e => {
 					  const val = e.target.value;
 						// [핵심] 입력 중에는 무조건 문자열로 저장하여 소수점 버그 방지
