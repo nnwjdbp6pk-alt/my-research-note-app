@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+﻿from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from .db import get_db
@@ -6,143 +6,143 @@ from . import schemas, crud
 
 router = APIRouter(prefix="/api")
 
-# --- 프로젝트 관련 API ---
+# --- ?꾨줈?앺듃 愿??API ---
 
-@router.get("/projects", response_model=list[schemas.ProjectOut], summary="전체 프로젝트 목록 조회")
+@router.get("/projects", response_model=list[schemas.ProjectOut], summary="?꾩껜 ?꾨줈?앺듃 紐⑸줉 議고쉶")
 def list_projects(db: Session = Depends(get_db)):
-    """등록된 모든 프로젝트의 목록을 최신순으로 가져옵니다."""
+    """?깅줉??紐⑤뱺 ?꾨줈?앺듃??紐⑸줉??理쒖떊?쒖쑝濡?媛?몄샃?덈떎."""
     return crud.list_projects(db)
 
-@router.post("/projects", response_model=schemas.ProjectOut, status_code=status.HTTP_201_CREATED, summary="새 프로젝트 생성")
+@router.post("/projects", response_model=schemas.ProjectOut, status_code=status.HTTP_201_CREATED, summary="???꾨줈?앺듃 ?앹꽦")
 def create_project(payload: schemas.ProjectCreate, db: Session = Depends(get_db)):
-    """새로운 연구 프로젝트를 생성합니다."""
+    """?덈줈???곌뎄 ?꾨줈?앺듃瑜??앹꽦?⑸땲??"""
     return crud.create_project(db, payload)
 
-@router.get("/projects/{project_id}", response_model=schemas.ProjectOut, summary="단일 프로젝트 상세 조회")
+@router.get("/projects/{project_id}", response_model=schemas.ProjectOut, summary="?⑥씪 ?꾨줈?앺듃 ?곸꽭 議고쉶")
 def get_project(project_id: int, db: Session = Depends(get_db)):
-    """특정 ID를 가진 프로젝트의 상세 정보를 조회합니다."""
+    """?뱀젙 ID瑜?媛吏??꾨줈?앺듃???곸꽭 ?뺣낫瑜?議고쉶?⑸땲??"""
     obj = crud.get_project(db, project_id)
     if not obj:
-        raise HTTPException(status_code=404, detail="해당 프로젝트를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?대떦 ?꾨줈?앺듃瑜?李얠쓣 ???놁뒿?덈떎.")
     return obj
 
-@router.patch("/projects/{project_id}", response_model=schemas.ProjectOut, summary="프로젝트 정보 수정")
+@router.patch("/projects/{project_id}", response_model=schemas.ProjectOut, summary="?꾨줈?앺듃 ?뺣낫 ?섏젙")
 def update_project(project_id: int, payload: schemas.ProjectUpdate, db: Session = Depends(get_db)):
-    """프로젝트의 이름, 상태(진행/종료), 유형 등을 수정합니다."""
+    """?꾨줈?앺듃???대쫫, ?곹깭(吏꾪뻾/醫낅즺), ?좏삎 ?깆쓣 ?섏젙?⑸땲??"""
     obj = crud.update_project(db, project_id, payload)
     if not obj:
-        raise HTTPException(status_code=404, detail="수정할 프로젝트를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?섏젙???꾨줈?앺듃瑜?李얠쓣 ???놁뒿?덈떎.")
     return obj
 
-@router.delete("/projects/{project_id}", summary="프로젝트 삭제")
+@router.delete("/projects/{project_id}", summary="?꾨줈?앺듃 ??젣")
 def delete_project(project_id: int, db: Session = Depends(get_db)):
-    """프로젝트와 관련된 모든 데이터(실험, 스키마 등)를 삭제합니다."""
+    """?꾨줈?앺듃? 愿?⑤맂 紐⑤뱺 ?곗씠???ㅽ뿕, ?ㅽ궎留???瑜???젣?⑸땲??"""
     ok = crud.delete_project(db, project_id)
     if not ok:
-        raise HTTPException(status_code=404, detail="삭제할 프로젝트를 찾을 수 없습니다.")
-    return {"ok": True, "message": "프로젝트가 성공적으로 삭제되었습니다."}
+        raise HTTPException(status_code=404, detail="??젣???꾨줈?앺듃瑜?李얠쓣 ???놁뒿?덈떎.")
+    return {"ok": True, "message": "?꾨줈?앺듃媛 ?깃났?곸쑝濡???젣?섏뿀?듬땲??"}
 
 
-# --- 실험(Experiment) 관련 API ---
+# --- ?ㅽ뿕(Experiment) 愿??API ---
 
-@router.get("/projects/{project_id}/experiments", response_model=list[schemas.ExperimentOut], summary="프로젝트별 실험 목록 조회")
+@router.get("/projects/{project_id}/experiments", response_model=list[schemas.ExperimentOut], summary="?꾨줈?앺듃蹂??ㅽ뿕 紐⑸줉 議고쉶")
 def list_experiments(project_id: int, db: Session = Depends(get_db)):
-    """특정 프로젝트에 속한 모든 실험 기록을 최신순으로 조회합니다."""
+    """?뱀젙 ?꾨줈?앺듃???랁븳 紐⑤뱺 ?ㅽ뿕 湲곕줉??理쒖떊?쒖쑝濡?議고쉶?⑸땲??"""
     return crud.list_experiments(db, project_id)
 
-@router.post("/experiments", response_model=schemas.ExperimentOut, status_code=status.HTTP_201_CREATED, summary="실험 결과 기록")
+@router.post("/experiments", response_model=schemas.ExperimentOut, status_code=status.HTTP_201_CREATED, summary="?ㅽ뿕 寃곌낵 湲곕줉")
 def create_experiment(payload: schemas.ExperimentCreate, db: Session = Depends(get_db)):
-    """새로운 실험 데이터를 기록합니다. 배합 정보와 결과값 검증이 포함됩니다."""
+    """?덈줈???ㅽ뿕 ?곗씠?곕? 湲곕줉?⑸땲?? 諛고빀 ?뺣낫? 寃곌낵媛?寃利앹씠 ?ы븿?⑸땲??"""
     proj = crud.get_project(db, payload.project_id)
     if not proj:
-        raise HTTPException(status_code=400, detail="유효하지 않은 프로젝트 ID입니다.")
+        raise HTTPException(status_code=400, detail="?좏슚?섏? ?딆? ?꾨줈?앺듃 ID?낅땲??")
     try:
         return crud.create_experiment(db, payload)
     except ValueError as exc:
-        # crud.validate_result_values 등에서 발생한 검증 에러를 반환
+        # crud.validate_result_values ?깆뿉??諛쒖깮??寃利??먮윭瑜?諛섑솚
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-@router.get("/experiments/{experiment_id}", response_model=schemas.ExperimentOut, summary="실험 상세 조회")
+@router.get("/experiments/{experiment_id}", response_model=schemas.ExperimentOut, summary="?ㅽ뿕 ?곸꽭 議고쉶")
 def get_experiment(experiment_id: int, db: Session = Depends(get_db)):
-    """특정 실험의 원료 배합 및 결과값 상세 정보를 조회합니다."""
+    """?뱀젙 ?ㅽ뿕???먮즺 諛고빀 諛?寃곌낵媛??곸꽭 ?뺣낫瑜?議고쉶?⑸땲??"""
     obj = crud.get_experiment(db, experiment_id)
     if not obj:
-        raise HTTPException(status_code=404, detail="해당 실험 기록을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?대떦 ?ㅽ뿕 湲곕줉??李얠쓣 ???놁뒿?덈떎.")
     return obj
 
-@router.patch("/experiments/{experiment_id}", response_model=schemas.ExperimentOut, summary="실험 기록 수정")
+@router.patch("/experiments/{experiment_id}", response_model=schemas.ExperimentOut, summary="?ㅽ뿕 湲곕줉 ?섏젙")
 def update_experiment(experiment_id: int, payload: schemas.ExperimentUpdate, db: Session = Depends(get_db)):
-    """기존 실험의 정보를 수정하거나 추가 결과를 입력합니다."""
+    """湲곗〈 ?ㅽ뿕???뺣낫瑜??섏젙?섍굅??異붽? 寃곌낵瑜??낅젰?⑸땲??"""
     try:
         obj = crud.update_experiment(db, experiment_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     
     if not obj:
-        raise HTTPException(status_code=404, detail="수정할 실험 기록을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?섏젙???ㅽ뿕 湲곕줉??李얠쓣 ???놁뒿?덈떎.")
     return obj
 
-@router.delete("/experiments/{experiment_id}", summary="실험 기록 삭제")
+@router.delete("/experiments/{experiment_id}", summary="?ㅽ뿕 湲곕줉 ??젣")
 def delete_experiment(experiment_id: int, db: Session = Depends(get_db)):
-    """특정 실험 기록을 삭제합니다."""
+    """?뱀젙 ?ㅽ뿕 湲곕줉????젣?⑸땲??"""
     ok = crud.delete_experiment(db, experiment_id)
     if not ok:
-        raise HTTPException(status_code=404, detail="삭제할 실험 기록을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="??젣???ㅽ뿕 湲곕줉??李얠쓣 ???놁뒿?덈떎.")
     return {"ok": True}
 
 
-# --- 결과 스키마(Result Schema) 관련 API ---
+# --- 寃곌낵 ?ㅽ궎留?Result Schema) 愿??API ---
 
-@router.get("/projects/{project_id}/result-schemas", response_model=list[schemas.ResultSchemaOut], summary="프로젝트별 측정 항목 조회")
+@router.get("/projects/{project_id}/result-schemas", response_model=list[schemas.ResultSchemaOut], summary="?꾨줈?앺듃蹂?痢≪젙 ??ぉ 議고쉶")
 def list_result_schemas(project_id: int, db: Session = Depends(get_db)):
-    """프로젝트에서 정의한 결과 입력 항목(스키마) 목록을 가져옵니다."""
+    """?꾨줈?앺듃?먯꽌 ?뺤쓽??寃곌낵 ?낅젰 ??ぉ(?ㅽ궎留? 紐⑸줉??媛?몄샃?덈떎."""
     return crud.list_result_schemas(db, project_id)
 
-@router.post("/result-schemas", response_model=schemas.ResultSchemaOut, summary="측정 항목 정의 생성")
+@router.post("/result-schemas", response_model=schemas.ResultSchemaOut, summary="痢≪젙 ??ぉ ?뺤쓽 ?앹꽦")
 def create_result_schema(payload: schemas.ResultSchemaCreate, db: Session = Depends(get_db)):
-    """실험 결과를 입력받을 새로운 항목(예: 점도, pH 등)을 정의합니다."""
+    """?ㅽ뿕 寃곌낵瑜??낅젰諛쏆쓣 ?덈줈????ぉ(?? ?먮룄, pH ?????뺤쓽?⑸땲??"""
     proj = crud.get_project(db, payload.project_id)
     if not proj:
-        raise HTTPException(status_code=400, detail="유효하지 않은 프로젝트 ID입니다.")
+        raise HTTPException(status_code=400, detail="?좏슚?섏? ?딆? ?꾨줈?앺듃 ID?낅땲??")
     
         
     return crud.create_result_schema(db, payload)
 
-@router.patch("/result-schemas/{schema_id}", response_model=schemas.ResultSchemaOut, summary="측정 항목 정의 수정")
+@router.patch("/result-schemas/{schema_id}", response_model=schemas.ResultSchemaOut, summary="痢≪젙 ??ぉ ?뺤쓽 ?섏젙")
 def update_result_schema(schema_id: int, payload: schemas.ResultSchemaUpdate, db: Session = Depends(get_db)):
-    """기존에 정의된 측정 항목의 이름, 단위, 옵션 등을 수정합니다."""
-    # 수정 시에도 타입이 변경되거나 유지되는 경우 옵션 유효성 체크
+    """湲곗〈???뺤쓽??痢≪젙 ??ぉ???대쫫, ?⑥쐞, ?듭뀡 ?깆쓣 ?섏젙?⑸땲??"""
+    # ?섏젙 ?쒖뿉????낆씠 蹂寃쎈릺嫄곕굹 ?좎??섎뒗 寃쎌슦 ?듭뀡 ?좏슚??泥댄겕
     if payload.value_type == "categorical" and not payload.options:
-        raise HTTPException(status_code=422, detail="선택형 항목으로 수정 시 옵션 입력이 필수입니다.")
+        raise HTTPException(status_code=422, detail="?좏깮????ぉ?쇰줈 ?섏젙 ???듭뀡 ?낅젰???꾩닔?낅땲??")
         
     obj = crud.update_result_schema(db, schema_id, payload)
     if not obj:
-        raise HTTPException(status_code=404, detail="해당 측정 항목 정의를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="?대떦 痢≪젙 ??ぉ ?뺤쓽瑜?李얠쓣 ???놁뒿?덈떎.")
     return obj
 
-@router.delete("/result-schemas/{schema_id}", summary="측정 항목 정의 삭제")
+@router.delete("/result-schemas/{schema_id}", summary="痢≪젙 ??ぉ ?뺤쓽 ??젣")
 def delete_result_schema(schema_id: int, db: Session = Depends(get_db)):
-    """측정 항목 정의를 삭제합니다. (주의: 기존 실험 데이터의 해당 항목 값이 유실될 수 있음)"""
+    """痢≪젙 ??ぉ ?뺤쓽瑜???젣?⑸땲?? (二쇱쓽: 湲곗〈 ?ㅽ뿕 ?곗씠?곗쓽 ?대떦 ??ぉ 媛믪씠 ?좎떎?????덉쓬)"""
     ok = crud.delete_result_schema(db, schema_id)
     if not ok:
-        raise HTTPException(status_code=404, detail="삭제할 항목 정의를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="??젣????ぉ ?뺤쓽瑜?李얠쓣 ???놁뒿?덈떎.")
     return {"ok": True}
 
 
-# --- 출력 설정(Output Config) 관련 API ---
+# --- 異쒕젰 ?ㅼ젙(Output Config) 愿??API ---
 
-@router.get("/projects/{project_id}/output-config", response_model=schemas.OutputConfigOut | None, summary="프로젝트별 출력 설정 조회")
+@router.get("/projects/{project_id}/output-config", response_model=schemas.OutputConfigOut | None, summary="?꾨줈?앺듃蹂?異쒕젰 ?ㅼ젙 議고쉶")
 def get_output_config(project_id: int, db: Session = Depends(get_db)):
     obj = crud.get_output_config(db, project_id)
     if not obj:
-        # 프론트엔드 에러 방지를 위한 빈 객체 반환
-        return {"project_id": project_id, "included_keys": [], "id": -1, "created_at": None}
+        # ?꾨줎?몄뿏???먮윭 諛⑹?瑜??꾪븳 鍮?媛앹껜 諛섑솚
+        return None
     return obj
 
-@router.put("/output-config", response_model=schemas.OutputConfigOut, summary="출력 설정 저장/업데이트")
+@router.put("/output-config", response_model=schemas.OutputConfigOut, summary="異쒕젰 ?ㅼ젙 ????낅뜲?댄듃")
 def upsert_output_config(payload: schemas.OutputConfigUpsert, db: Session = Depends(get_db)):
-    """테이블이나 차트에 표시할 항목(키 리스트)을 저장합니다."""
+    """?뚯씠釉붿씠??李⑦듃???쒖떆????ぉ(??由ъ뒪??????ν빀?덈떎."""
     proj = crud.get_project(db, payload.project_id)
     if not proj:
-        raise HTTPException(status_code=400, detail="유효하지 않은 프로젝트 ID입니다.")
+        raise HTTPException(status_code=400, detail="?좏슚?섏? ?딆? ?꾨줈?앺듃 ID?낅땲??")
     return crud.upsert_output_config(db, payload)
