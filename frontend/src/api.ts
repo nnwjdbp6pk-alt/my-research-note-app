@@ -11,7 +11,7 @@ const api = axios.create({ baseURL: API_BASE_URL })
 export type Project = {
   id: number
   name: string
-  project_type: 'VOC' | 'REGULAR'
+  project_type: 'VOC' | 'REGULAR' | 'PROPERTY_COMPARE'
   expected_end_date: string | null
   status: 'ONGOING' | 'CLOSED'
   created_at: string
@@ -50,9 +50,32 @@ export type Experiment = {
   name: string
   author: string
   purpose: string
+  experiment_conditions?: string | null
+  experiment_date?: string | null
+  requester?: string | null
+  received_date?: string | null
   materials: Material[]
   result_values: Record<string, unknown>
   created_at: string
+}
+
+export type Ingredient = {
+  id: number
+  name: string
+  normalized_name: string
+  use_count: number
+  created_at: string
+  last_used_at: string
+}
+
+export type DataImportSummary = {
+  projects_created: number
+  projects_updated: number
+  experiments_created: number
+  experiments_updated: number
+  ingredients_created: number
+  ingredients_updated: number
+  skipped_rows: number
 }
 
 export async function listProjects() {
@@ -62,7 +85,7 @@ export async function listProjects() {
 
 export async function createProject(payload: {
   name: string
-  project_type?: 'VOC' | 'REGULAR'
+  project_type?: 'VOC' | 'REGULAR' | 'PROPERTY_COMPARE'
   expected_end_date?: string | null
   status?: 'ONGOING' | 'CLOSED'
 }) {
@@ -151,5 +174,38 @@ export async function updateExperiment(
 
 export async function deleteExperiment(experimentId: number) {
   const r = await api.delete<{ ok: boolean }>(`/api/experiments/${experimentId}`)
+  return r.data
+}
+
+export async function listIngredients(q?: string, limit = 50) {
+  const r = await api.get<Ingredient[]>('/api/ingredients', {
+    params: { q: q || undefined, limit },
+  })
+  return r.data
+}
+
+export async function downloadTemplate(format: 'csv' | 'xlsx') {
+  const r = await api.get<Blob>('/api/data/template', {
+    params: { format },
+    responseType: 'blob',
+  })
+  return r.data
+}
+
+export async function exportData(format: 'csv' | 'xlsx', projectId?: number) {
+  const r = await api.get<Blob>('/api/data/export', {
+    params: { format, project_id: projectId },
+    responseType: 'blob',
+  })
+  return r.data
+}
+
+export async function importData(format: 'csv' | 'xlsx', file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const r = await api.post<DataImportSummary>('/api/data/import', formData, {
+    params: { format },
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return r.data
 }
