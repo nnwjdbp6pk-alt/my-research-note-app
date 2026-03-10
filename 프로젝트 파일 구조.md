@@ -1,0 +1,53 @@
+/my-research-note-app-main
+├── backend/
+│   ├── alembic/
+│		└──env.py              
+│   ├── app/
+│		├──__init__.py
+│		├──api.py
+│		├──crud.py
+│		├──db.py
+│		├──main.py
+│		├──models.py
+│		├──schemas.py
+│		├──seed.py
+│		└──settings.py
+│   ├──alembic.ini
+│   ├──app.db
+│   ├──pytest.ini
+│   ├──README.md
+│   └──requirements.txt
+├── frontend/
+│   ├── node_modules/                 
+│   ├── src/
+│   	├── app/
+│			├──pages/
+│				├──NewExperimentPage.tsx
+│				├──OutputPage.tsx
+│				├──ProjectDetailPage.tsx
+│				└──ProjectsPage.tsx
+│			└──App.tsx
+│   	├── src/
+│   		├── app/
+│				├──pages/
+│					├──NewExperimentPage.tsx
+│					├──OutputPage.tsx
+│					├──ProjectDetailPage.tsx
+│					└──ProjectsPage.tsx
+│				└──App.tsx
+│			├──api.ts
+│			├──main.tsx
+│			├──styles.css
+│			└──
+│		├──api.ts
+│		├──main.tsx
+│		└──styles.css            
+│   ├── index.html              
+│   ├── package.json
+│   ├──package-lock.json
+│   ├──README.md
+│   ├──tsconfig.json  
+│   └──vite.config.ts        
+├──README.md
+├── package.json
+└── turbo.json
