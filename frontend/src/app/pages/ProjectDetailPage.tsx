@@ -324,6 +324,9 @@ export default function ProjectDetailPage() {
                       <option value="categorical">선택값</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="field-grid">
                   <div className="field-group">
                     <label className="small">순서</label>
                     <input
@@ -334,9 +337,6 @@ export default function ProjectDetailPage() {
                       placeholder="순서"
                     />
                   </div>
-                </div>
-
-                <div className="field-grid">
                   <div className="field-group">
                     <label className="small">단위</label>
                     <input
